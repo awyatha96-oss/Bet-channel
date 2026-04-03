@@ -21,52 +21,70 @@ def run_port_server():
 # --- CONFIGURATION ---
 API_ID = 32153130
 API_HASH = '66168465c6360e3d856a8a53a3d21e84'
-SESSION_STRING = '1BZWaqwUBu54l2KPxOFDkpU-V7HDwr7Nutf7QUfvqScZTiMz_5eY3xkUu4DJLsTV-O1Jx9xxEWVy7Z4N5Q5pI8vokCMEbJSBRFRgOCB5tI4LLdS8msRAqd3X8vH5ZWGe083VuLUMx0Y5mqTG7sZoffY9uB4iJQ4HsDoeflz-V0h82KdfuycU3gnSFgfXN5VkD0oV9oIyZRzIzctMnmOHVOL6vJa6n-rE2dCDKPbtuH3Nh-1imt0ecXMo1579xBIXNY6M06CsmYuDl5rmJO1ZdsTlheYa7OnCVwch0XPEnWfrlo2psk7yYFaxSIrt4Yq0IBJ-7JG1nxxJXNw0AJNR3jz_Px4mPcR4='
+SESSION_STRING = '1BZWaqwUBu54l2KPxOFDkpU-V7HDwr7Nutf7QUfv?ScZTiMz_5eY3xkUu4DJLsTV-O1Jx9xxEWVy7Z4N5Q5pI8vokCMEbJSBRFRgOCB5tI4LLdS8msRAqd3X8vH5ZWGe083VuLUMx0Y5mqTG7sZoffY9uB4iJQ4HsDoeflz-V0h82KdfuycU3gnSFgfXN5VkD0oV9oIyZRzIzctMnmOHVOL6vJa6n-rE2dCDKPbtuH3Nh-1imt0ecXMo1579xBIXNY6M06CsmYuDl5rmJO1ZdsTlheYa7OnCVwch0XPEnWfrlo2psk7yYFaxSIrt4Yq0IBJ-7JG1nxxJXNw0AJNR3jz_Px4mPcR4='
 
 SOURCE_CHANNEL = -1002609048662 
 TARGET_CHANNEL = '@onexbet_1xbet7'
 
-def clean_and_filter(text):
-    if not text:
-        return ""
-    
-    # Check for Winning Ticket
-    if any(x in text.lower() for x in ['paid out', 'won', 'gagné', 'payé']):
-        return "WON✅"
-    
-    # Remove Non-ASCII (Emojis)
-    text = text.encode('ascii', 'ignore').decode('ascii')
-    
-    # Remove Links and Usernames
-    text = re.sub(r'https?://\S+|t\.me/\S+|@[\w\d_]+', '', text)
-    
-    # Extract Betting Code (Uppercase + Numbers, 5-7 chars)
-    codes = re.findall(r'\b[A-Z0-9]{5,7}\b', text)
-    if codes:
-        return codes[0]
-        
-    return ""
+# Code တွေကို မှတ်ထားဖို့ Dictionary (Memory)
+# ပုံစံ - {'CODE123': 554, 'CODE456': 555} (Code နဲ့ Message ID တွဲမှတ်ခြင်း)
+posted_codes = {}
+
+def extract_code(text):
+    if not text: return None
+    # 5 လုံးမှ 8 လုံးကြားရှိသော စာလုံးကြီးနှင့် ဂဏန်းများ (Booking Code) ကို ရှာသည်
+    clean_text = text.encode('ascii', 'ignore').decode('ascii')
+    codes = re.findall(r'\b[A-Z0-9]{5,8}\b', clean_text)
+    return codes[0] if codes else None
+
+def is_winning_ss(text):
+    if not text: return False
+    # နိုင်တဲ့ စာသားပါမပါ စစ်ဆေးခြင်း
+    keywords = ['paid out', 'won', 'gagne', 'paye', 'success', 'boom']
+    return any(x in text.lower() for x in keywords)
 
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 @client.on(events.NewMessage(chats=SOURCE_CHANNEL))
 async def handler(event):
-    # Only process messages with media (Photo/File)
+    global posted_codes
+    
     if not event.media:
         return
 
-    processed_text = clean_and_filter(event.raw_text)
+    raw_text = event.raw_text
+    found_code = extract_code(raw_text)
     
     try:
-        await client.send_message(TARGET_CHANNEL, processed_text, file=event.media)
-        print(f"Success: {processed_text}")
+        # ၁။ နိုင်တဲ့ပုံ ဖြစ်ခဲ့ရင်
+        if is_winning_ss(raw_text):
+            reply_id = None
+            # ပုံထဲမှာ Code ပါရင် အဲဒီ Code တင်ခဲ့တဲ့ Post ကို ရှာမယ်
+            if found_code and found_code in posted_codes:
+                reply_id = posted_codes[found_code]
+            
+            await client.send_message(
+                TARGET_CHANNEL, 
+                "BOOM ✅", 
+                file=event.media, 
+                reply_to=reply_id
+            )
+            print(f"✅ Won SS Posted (Replied to: {reply_id})")
+
+        # ၂။ Booking Code အသစ်တင်တာ ဖြစ်ခဲ့ရင်
+        elif found_code:
+            sent_msg = await client.send_message(TARGET_CHANNEL, found_code, file=event.media)
+            # Code နဲ့ Message ID ကို မှတ်ထားလိုက်တယ်
+            posted_codes[found_code] = sent_msg.id
+            print(f"📌 Code Recorded: {found_code} -> ID: {sent_msg.id}")
+
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"❌ Error: {e}")
 
 async def main():
     Thread(target=run_port_server, daemon=True).start()
     await client.start()
-    print("🚀 Bot is running...")
+    print("🚀 Bot is live with Smart Reply System...")
     await client.run_until_disconnected()
 
 if __name__ == '__main__':
