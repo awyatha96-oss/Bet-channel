@@ -1,7 +1,6 @@
 import re
 import asyncio
 import os
-import base64
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -22,19 +21,12 @@ def run_port_server():
 # --- CONFIGURATION ---
 API_ID = 32153130
 API_HASH = '66168465c6360e3d856a8a53a3d21e84'
-
-# String ကို ပြန်ပြင်ပေးမည့်အပိုင်း
-RAW_STRING = '1BZWaqwUBu54l2KPxOFDkpU-V7HDwr7Nutf7QUfvqScZTiMz_5eY3xkUu4DJLsTV-O1Jx9xxEWVy7Z4N5Q5pI8vokCMEbJSBRFRgOCB5tI4LLdS8msRAqd3X8vH5ZWGe083VuLUMx0Y5mqTG7sZoffY9uB4iJQ4HsDoeflz-V0h82KdfuycU3gnSFgfXN5VkD0oV9oIyZRzIzctMnmOHVOL6vJa6n-rE2dCDKPbtuH3Nh-1imt0ecXMo1579xBIXNY6M06CsmYuDl5rmJO1ZdsTlheYa7OnCVwch0XPEnWfrlo2psk7yYFaxSIrt4Yq0IBJ-7JG1nxxJXNw0AJNR3jz_Px4mPcR4='
-
-def fix_padding(s):
-    s = s.strip()
-    return s + '=' * (-len(s) % 4)
-
-SESSION_STRING = fix_padding(RAW_STRING)
+SESSION_STRING = '1BZWaqwUBu4ioYJx7d-ivKN3BcBp3jaE7ydI3LpFxbcmcKxr8nNlrbCl0KbWyHUkpDIg38xkh1As6tnxppFNDLaz3r6GjCkciq-yRcWl30RW4nz7quowo-Hdld4SA1hgz3OEie5F6Eo4jAvQsJuLTrvNpbeHhK8DjZ184fE1nV9AHOZolqBjUgGJgj89d8qDL32gPrntXRIKlP4UbIZsD0JlqmzC_0fJhQfzG7qVcFp7ttrCo0WXX09h8xgGDKx_yfmlumE0AwYKY6QuZ7NUDHf_iTkXrhs8_2H82hU1SHvzEKACqPSzQTBj0oGyMEjAJjpWW8HsAxnShsx7rszj254vHXH9nVYs='
 
 SOURCE_CHANNEL = -1002609048662 
 TARGET_CHANNEL = '@onexbet_1xbet7'
 
+# Memory for Smart Reply
 posted_codes = {}
 
 def extract_code(text):
@@ -59,6 +51,7 @@ async def handler(event):
     found_code = extract_code(raw_text)
     
     try:
+        # 1. Winning Screenshot Logic
         if is_winning_ss(raw_text):
             reply_id = None
             if found_code and found_code in posted_codes:
@@ -70,9 +63,14 @@ async def handler(event):
                 file=event.media, 
                 reply_to=reply_id
             )
+            print(f"Posted: WON SS (Reply to: {reply_id})")
+
+        # 2. New Booking Code Logic
         elif found_code:
             sent_msg = await client.send_message(TARGET_CHANNEL, found_code, file=event.media)
             posted_codes[found_code] = sent_msg.id
+            print(f"Recorded: {found_code}")
+
     except Exception as e:
         print(f"Error: {e}")
 
@@ -80,10 +78,10 @@ async def main():
     Thread(target=run_port_server, daemon=True).start()
     try:
         await client.start()
-        print("Bot is started successfully!")
+        print("Bot Started Successfully!")
         await client.run_until_disconnected()
     except Exception as e:
-        print(f"Critical Error: {e}")
+        print(f"Connection Error: {e}")
 
 if __name__ == '__main__':
     asyncio.run(main())
