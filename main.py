@@ -19,9 +19,6 @@ def run_port_server():
 # --- CONFIGURATION ---
 API_ID = 32153130
 API_HASH = '66168465c6360e3d856a8a53a3d21e84'
-
-# သင့်ရဲ့ QR နဲ့ရလာတဲ့ String ကို အောက်က ' ' ထဲမှာ သေချာထည့်ပါ
-# အစနဲ့အဆုံးမှာ Space (ဟာကွက်) မပါအောင် သတိထားပါ
 MY_STR = '1BZWaqwUBu4ioYJx7d-ivKN3BcBp3jaE7ydI3LpFxbcmcKxr8nNlrbCl0KbWyHUkpDIg38xkh1As6tnxppFNDLaz3r6GjCkciq-yRcWl30RW4nz7quowo-Hdld4SA1hgz3OEie5F6Eo4jAvQsJuLTrvNpbeHhK8DjZ184fE1nV9AHOZolqBjUgGJgj89d8qDL32gPrntXRIKlP4UbIZsD0JlqmzC_0fJhQfzG7qVcFp7ttrCo0WXX09h8xgGDKx_yfmlumE0AwYKY6QuZ7NUDHf_iTkXrhs8_2H82hU1SHvzEKACqPSzQTBj0oGyMEjAJjpWW8HsAxnShsx7rszj254vHXH9nVYs='
 
 SOURCE_CH = -1002609048662 
@@ -55,24 +52,14 @@ async def handler(event):
         print(f"Error: {e}")
 
 async def start_bot():
-    try:
-        # connect() နဲ့ အရင်ချိတ်ပါမယ်
-        await client.connect()
-        
-        # အကောင့်ဝင်ထားပြီးသား ဟုတ်မဟုတ် စစ်ဆေးပါတယ်
-        if not await client.is_user_authorized():
-            print("❌ ERROR: SESSION EXPIRED OR INVALID. PLEASE GET NEW QR STRING.")
-            return
-
-        print("🚀 BOT IS SUCCESSFULLY ONLINE!")
-        await client.run_until_disconnected()
-    except Exception as e:
-        print(f"❌ CRITICAL ERROR: {e}")
+    # Loop Error ကင်းအောင် client.start() ကို တိုက်ရိုက်သုံးပါမယ်
+    await client.start()
+    print("🚀 BOT IS SUCCESSFULLY ONLINE!")
+    await client.run_until_disconnected()
 
 if __name__ == '__main__':
-    # Render အတွက် Port ဖွင့်ပေးခြင်း
+    # Web Server ကို Thread သီးသန့်နဲ့ Run ပါမယ်
     Thread(target=run_port_server, daemon=True).start()
     
-    # Bot စတင်ခြင်း
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(start_bot())
+    # Bot ကို Asyncio သုံးပြီး Run ပါမယ်
+    asyncio.run(start_bot())
