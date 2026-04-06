@@ -1,35 +1,30 @@
-import re
-import asyncio
-import os
+import re, asyncio, os
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
 
 # --- RENDER PORT FIX ---
-class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200); self.end_headers()
-        self.wfile.write(b'Bot is Running')
-
 def run_port_server():
-    server = HTTPServer(('0.0.0.0', int(os.environ.get("PORT", 8080))), SimpleHTTPRequestHandler)
+    server = HTTPServer(('0.0.0.0', int(os.environ.get("PORT", 8080))), BaseHTTPRequestHandler)
     server.serve_forever()
 
 # --- CONFIGURATION ---
 API_ID = 32153130
 API_HASH = '66168465c6360e3d856a8a53a3d21e84'
-MY_STR = '1BZWaqwUBu4ioYJx7d-ivKN3BcBp3jaE7ydI3LpFxbcmcKxr8nNlrbCl0KbWyHUkpDIg38xkh1As6tnxppFNDLaz3r6GjCkciq-yRcWl30RW4nz7quowo-Hdld4SA1hgz3OEie5F6Eo4jAvQsJuLTrvNpbeHhK8DjZ184fE1nV9AHOZolqBjUgGJgj89d8qDL32gPrntXRIKlP4UbIZsD0JlqmzC_0fJhQfzG7qVcFp7ttrCo0WXX09h8xgGDKx_yfmlumE0AwYKY6QuZ7NUDHf_iTkXrhs8_2H82hU1SHvzEKACqPSzQTBj0oGyMEjAJjpWW8HsAxnShsx7rszj254vHXH9nVYs='
+MY_STR = '1BZWaqwUBu8D6AbOSX-7BpStNCyYD0yj_VYik53V2wssviWILbg-0OgNND3FOGog2XwXKtALIoIRoWwGFfr3I8tST-w9svHxDHWwkpk6CxVtN_csivY_HsTXQawvBDPrZqFbXUeQgvt4fN3Eb2Ndj156J-c0CJPN7UgTgw9Dhbc_Hqxby4weu8rDaicRqZ94muLUDPXzo9ku66OGfPBSutm6XgKIfqjTg2Djb-njaSuuADqQPq5-5lz3eoHCpP0VK8Vp8yDEGwHw5VVH-yZXV4yO3u5xzhdVJtCtR2fxIsMondvmwid_no4XWWy6YeBDDQcRaeQj_UcMFQTTOjc3iZZxjbIbdz5U='
 
-SOURCE_CH = -1002609048662 
+# --- SOURCE CHANNELS (ဒီနေရာမှာ Channel နှစ်ခုလုံး ထည့်ထားပါတယ်) ---
+SOURCE_CHANNELS = [-1002609048662, -1003510917243] 
+
 TARGET_CH = '@onexbet_1xbet7'
 
 posted_codes = {}
 
-# --- BOT CLIENT ---
-client = TelegramClient(StringSession(MY_STR), API_ID, API_HASH)
+client = TelegramClient(StringSession(MY_STR.strip()), API_ID, API_HASH)
 
-@client.on(events.NewMessage(chats=SOURCE_CH))
+# handler မှာ chats=SOURCE_CHANNELS လို့ ပြောင်းလိုက်ပါတယ်
+@client.on(events.NewMessage(chats=SOURCE_CHANNELS))
 async def handler(event):
     global posted_codes
     if not event.media: return
@@ -52,14 +47,13 @@ async def handler(event):
         print(f"Error: {e}")
 
 async def start_bot():
-    # Loop Error ကင်းအောင် client.start() ကို တိုက်ရိုက်သုံးပါမယ်
     await client.start()
-    print("🚀 BOT IS SUCCESSFULLY ONLINE!")
+    print("🚀 BOT IS SUCCESSFULLY ONLINE WITH 2 SOURCE CHANNELS!")
     await client.run_until_disconnected()
 
 if __name__ == '__main__':
-    # Web Server ကို Thread သီးသန့်နဲ့ Run ပါမယ်
     Thread(target=run_port_server, daemon=True).start()
-    
-    # Bot ကို Asyncio သုံးပြီး Run ပါမယ်
-    asyncio.run(start_bot())
+    try:
+        asyncio.run(start_bot())
+    except Exception as e:
+        print(f"Startup Error: {e}")
