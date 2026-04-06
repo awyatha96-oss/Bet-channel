@@ -5,18 +5,16 @@ from tinydb import TinyDB, Query
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
 
-# --- RENDER PORT FIX (Render မပိတ်သွားအောင် လုပ်ပေးတာပါ) ---
+# --- RENDER KEEP ALIVE SERVER ---
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b'Bot is Running')
+        self.wfile.write(b'Bot is Online')
 
 def run_port_server():
-    # Render ကပေးတဲ့ PORT ကိုသုံးပါမယ်၊ မရှိရင် 8080 ကိုသုံးပါမယ်
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
-    print(f"🌍 Web Server started on port {port}")
     server.serve_forever()
 
 # --- CONFIGURATION ---
@@ -27,7 +25,8 @@ MY_STR = '1BZWaqwUAUFhWe5a4HrhNqb1Ejrlpd9JiNOgSeqgpbnmmplFOqaVhzp2okt32gEq0j3uMX
 SOURCE_CHANNELS = [-1002609048662, -1003510917243] 
 TARGET_CH = '@onexbet_1xbet7'
 
-db = TinyDB('db.json')
+# Database path ကို တိတိကျကျ ပေးထားပါတယ်
+db = TinyDB('/tmp/db.json') 
 codes_table = db.table('posted_codes')
 
 client = TelegramClient(StringSession(MY_STR.strip()), API_ID, API_HASH)
@@ -35,29 +34,40 @@ client = TelegramClient(StringSession(MY_STR.strip()), API_ID, API_HASH)
 @client.on(events.NewMessage(chats=SOURCE_CHANNELS))
 async def handler(event):
     raw_text = event.raw_text or ""
-    codes = re.findall(r'\b[A-Z0-9]{5,9}\b', raw_text)
+    
+    # ၄ လုံးကနေ ၉ လုံးအထိ Code ရှာမယ် (52CAX လိုဟာမျိုးပါအောင်)
+    codes = re.findall(r'\b[A-Z0-9]{4,9}\b', raw_text)
     found_code = codes[0] if codes else None
+    
     is_won = any(x in raw_text.lower() for x in ['paid out', 'won', 'success', 'boom', 'paye', 'gagne'])
 
     try:
-        if is_won and found_code:
+        if is_won:
+            # စာသားထဲမှာ Code မပါရင် အရင်ဆုံး Database ထဲမှာ အနီးစပ်ဆုံး ရှာမယ်
             Record = Query()
-            result = codes_table.get(Record.code == found_code)
+            result = None
+            if found_code:
+                result = codes_table.get(Record.code == found_code)
+            
             if result:
                 await client.send_message(TARGET_CH, "BOOM ✅", file=event.media, reply_to=result['msg_id'])
+            else:
+                # Reply ထောက်စရာ ID ရှာမတွေ့ရင်တောင် ပုံတင်ပေးမယ်
+                await client.send_message(TARGET_CH, "BOOM ✅", file=event.media)
+                
         elif found_code and not is_won:
+            # Code အသစ်တင်ရင် ID ကို သိမ်းမယ်
             sent_msg = await client.send_message(TARGET_CH, found_code, file=event.media)
-            codes_table.insert({'code': found_code, 'msg_id': sent_msg.id})
-    except Exception: pass
+            codes_table.upsert({'code': found_code, 'msg_id': sent_msg.id}, Record.code == found_code)
+            
+    except Exception as e:
+        print(f"Error: {e}")
 
 async def start_bot():
     await client.start()
-    print("🚀 BOT IS LIVE AND PORT IS BOUND!")
+    print("🚀 BOT UPDATED & RUNNING!")
     await client.run_until_disconnected()
 
 if __name__ == '__main__':
-    # Web Server ကို Background မှာ Run ပါမယ်
     Thread(target=run_port_server, daemon=True).start()
-    
-    # Bot ကို Run ပါမယ်
     asyncio.run(start_bot())
