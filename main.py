@@ -5,7 +5,7 @@ from tinydb import TinyDB, Query
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
 
-# --- RENDER KEEP ALIVE SERVER ---
+# --- RENDER PORT KEEP ALIVE ---
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -25,6 +25,7 @@ MY_STR = '1BZWaqwUAUFhWe5a4HrhNqb1Ejrlpd9JiNOgSeqgpbnmmplFOqaVhzp2okt32gEq0j3uMX
 SOURCE_CHANNELS = [-1002609048662, -1003510917243] 
 TARGET_CH = '@onexbet_1xbet7'
 
+# Database Setup
 db = TinyDB('/tmp/db.json')
 codes_table = db.table('posted_codes')
 
@@ -32,52 +33,63 @@ client = TelegramClient(StringSession(MY_STR.strip()), API_ID, API_HASH)
 
 @client.on(events.NewMessage(chats=SOURCE_CHANNELS))
 async def handler(event):
-    # စာသားထဲက ကြော်ငြာတွေကို ဖယ်ဖို့ event.raw_text ကိုပဲ သုံးပြီး အသစ်ပြန်ရေးမယ်
+    # စာသားသက်သက်လာရင် လုံးဝမယူဘူး
+    if not event.media:
+        return 
+
     raw_text = event.raw_text or ""
     
-    # Booking Code ရှာဖွေခြင်း (စာလုံး ၄ လုံးမှ ၉ လုံး)
-    codes = re.findall(r'\b[A-Z0-9]{4,9}\b', raw_text)
-    found_code = codes[0] if codes else None
+    # ၁။ Booking Code ရှာဖွေခြင်း (စာလုံး ၄ လုံးမှ ၉ လုံး)
+    booking_codes = re.findall(r'\b[A-Z0-9]{4,9}\b', raw_text)
     
-    # နိုင်တဲ့ စာလုံးများ စစ်ဆေးခြင်း
+    # ၂။ Additional Info ဂဏန်း ၃ လုံး ရှာဖွေခြင်း (ပုံထဲက 428 လိုဟာမျိုး)
+    info_numbers = re.findall(r'\b\d{3}\b', raw_text)
+    
+    # နိုင်တဲ့စာသား စစ်ဆေးခြင်း
     is_won = any(x in raw_text.lower() for x in ['paid out', 'won', 'success', 'boom', 'paye', 'gagne', 'gagné'])
 
     try:
         # --- Won SS (နိုင်တဲ့ပုံ) ရောက်လာလျှင် ---
         if is_won:
-            # Won တဲ့အခါ Caption အဟောင်းကို မယူတော့ဘဲ "BOOM ✅" ပဲ သုံးမယ်
+            # Won တဲ့အခါ တခြားစာသားတွေအကုန်ဖြုတ်ပြီး BOOM ✅ ပဲ သုံးမယ်
             new_caption = "BOOM ✅"
             
-            if found_code:
+            # Additional Info နံပါတ်တူတာရှိမရှိ Database မှာ အရင်စစ်မယ်
+            target_id = None
+            if info_numbers:
                 Record = Query()
-                result = codes_table.get(Record.code == found_code)
-                
+                # အခု Won SS ထဲမှာပါတဲ့ ဂဏန်း ၃ လုံးနဲ့ အရင်တင်ထားတဲ့ Tip ထဲက ဂဏန်းနဲ့ တိုက်စစ်မယ်
+                result = codes_table.get(Record.info_num == info_numbers[0])
                 if result:
-                    # အရင် Tip ကို Reply ထောက်ပြီး ပုံသစ်တင်မယ်
-                    await client.send_message(TARGET_CH, new_caption, file=event.media, reply_to=result['msg_id'])
-                else:
-                    # Database ထဲမရှိရင် Reply မထောက်ဘဲ ပုံပဲတင်မယ်
-                    await client.send_message(TARGET_CH, new_caption, file=event.media)
+                    target_id = result['msg_id']
+            
+            # နံပါတ်ကိုက်ညီရင် Reply ထောက်မယ်၊ မကိုက်ရင် ပုံပဲတင်မယ်
+            if target_id:
+                await client.send_message(TARGET_CH, new_caption, file=event.media, reply_to=target_id)
             else:
-                # Code မပါရင်လည်း ပုံပဲတင်မယ်
                 await client.send_message(TARGET_CH, new_caption, file=event.media)
 
         # --- Tip အသစ် (Booking Code) ရောက်လာလျှင် ---
-        elif found_code and not is_won:
-            # Tip ပေးတဲ့အခါ ကြော်ငြာစာသားတွေ အကုန်ဖယ်ပြီး Booking Code တစ်ခုတည်းပဲ Caption ထည့်မယ်
-            new_tip_caption = found_code
+        elif booking_codes and not is_won:
+            # တခြားစာသားတွေဖြုတ်ပြီး Booking Code တစ်ခုတည်းပဲ Caption ထည့်မယ်
+            found_booking = booking_codes[0]
+            found_info = info_numbers[0] if info_numbers else "None"
             
-            sent_msg = await client.send_message(TARGET_CH, new_tip_caption, file=event.media)
+            sent_msg = await client.send_message(TARGET_CH, found_booking, file=event.media)
             
-            # ID ကို သိမ်းမယ်
-            codes_table.upsert({'code': found_code, 'msg_id': sent_msg.id}, Query().code == found_code)
+            # Booking Code နဲ့ Additional Info နံပါတ်ကိုပါ တွဲသိမ်းမယ်
+            codes_table.upsert({
+                'code': found_booking, 
+                'info_num': found_info, 
+                'msg_id': sent_msg.id
+            }, Query().code == found_booking)
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")
 
 async def start_bot():
     await client.start()
-    print("🚀 BOT IS RUNNING WITHOUT ADS!")
+    print("🚀 BOT IS RUNNING: TRACKING ADDITIONAL INFO NUMBERS!")
     await client.run_until_disconnected()
 
 if __name__ == '__main__':
